@@ -1,13 +1,27 @@
 import telebot
 import sqlite3
+import os
 from telebot import types
-bot = telebot.TeleBot('7144328068:AAGZC51FoyHuand184ew7lRjYf7SZk4y7r0')
+from cryptography.fernet import Fernet
+
+# Загрузка переменных окружения
+from dotenv import load_dotenv
+load_dotenv()
+
+# Шифрування токену
+key = os.getenv('ENCRYPTION_KEY').encode()
+cipher_suite = Fernet(key)
+encrypted_token = os.getenv('ENCRYPTED_TOKEN').encode()
+
+token = cipher_suite.decrypt(encrypted_token).decode("utf-8")
+bot = telebot.TeleBot(token)
+
 
 # Словник з перекладами
 translations = {
     'en': {
         'main_menu': 'Main Menu',
-        'profile': 'Profile',
+        'profile': '👤 Profile',
         'lang': '🏳️ Change language',
         'support': '⚙️ Support',
         'create_post': '✏️ Create post',
@@ -20,11 +34,12 @@ translations = {
         'quick_post': 'Quick post',
         'tech_support': 'Technical support',
         'community_support': 'Community support',
-        'commercial_offer': 'Commercial offer'
+        'commercial_offer': 'Commercial offer',
+        'choose_option_text': 'Choose an option:'
     },
     'ua': {
         'main_menu': 'Головне меню',
-        'profile': 'Профіль',
+        'profile': '👤 Профіль',
         'lang': '🏳️ Змінити мову',
         'support': '⚙️ Підтримка',
         'create_post': '✏️ Створити пост',
@@ -37,7 +52,8 @@ translations = {
         'quick_post': 'Швидкий пост',
         'tech_support': 'Технічна підтримка',
         'community_support': 'Підтримка спільноти',
-        'commercial_offer': 'Комерційна пропозиція'
+        'commercial_offer': 'Комерційна пропозиція',
+        'choose_option_text': 'Оберіть опцію:'
     }
 }
 # Словник для зберігання вибраної мови для кожного користувача
@@ -138,6 +154,29 @@ def support(message):
     markup.add(types.InlineKeyboardButton(translations[lang]['commercial_offer'], url="https://t.me/faustyyn"))
     bot.send_message(chat_id, translations[lang]['type_support'], reply_markup=markup)
 
+# Обробник профілю
+@bot.message_handler(func=lambda message: message.text in ['👤 Profile', '👤 Профіль'])
+def profile(message):
+    chat_id = message.chat.id
+    connection = sqlite3.connect('database.sql')
+    cursor = connection.cursor()
+    cursor.execute('SELECT * FROM users WHERE chat_id = ?', (chat_id,))
+    user = cursor.fetchone()
+    cursor.close()
+    connection.close()
+    bot.send_message(chat_id, f"➖➖➖➖➖➖➖➖➖➖➖\nІнформація про користувача:")
+    if user:
+        if user[4] == 'ua':
+            bot.send_message(chat_id, f"Login: {user[1]}\nID: {user[2]}\nStatus: {user[3]}\nLanguage: 🇺🇦")
+            bot.send_message(chat_id, f"Для зміни статуса будь-ласка звернітся до технічної підтримки")
+        else:
+            bot.send_message(chat_id, f"Username: {user[1]}\nChat ID: {user[2]}\nStatus: {user[3]}\nLanguage: 🇬🇧")
+            bot.send_message(chat_id, f"Для зміни статуса будь-ласка звернітся до технічної підтримки")
+    else:
+        bot.send_message(chat_id, "User not found,please write to technical support! Error code: 404")
+    bot.send_message(chat_id, f"➖➖➖➖➖➖➖➖➖➖➖")
+
+
 
 # Обробник створення посту
 @bot.message_handler(func=lambda message: message.text in ['✏️ Create post', '✏️ Створити пост'])
@@ -150,7 +189,7 @@ def create_post(message):
     btn2 = types.KeyboardButton(translations[lang]['create_new_template'])
     btn3 = types.KeyboardButton(translations[lang]['quick_post'])
     markup.add(btn0, btn1, btn2, btn3)
-    bot.send_message(chat_id, "Choose an option:", reply_markup=markup)
+    bot.send_message(chat_id, translations[lang]['choose_option_text'], reply_markup=markup)
 
 
 bot.polling(none_stop=True)

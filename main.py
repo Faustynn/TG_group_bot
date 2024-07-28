@@ -11,6 +11,9 @@ config = toml.load('config.toml')
 token = config['telegram']['key']
 group_chat_id = config['telegram']['groupChat']
 
+roles = toml.load('hight-roles.toml')['roles']
+
+
 bot = telebot.TeleBot(token, state_storage=StateMemoryStorage())
 
 # Словарь с переводами
@@ -142,10 +145,6 @@ def get_chat_id(message):
     login = message.from_user.username
     chat_id = message.chat.id
 
-    if login == "alglive":
-        cursor.execute("UPDATE users SET status = 'ADMIN' WHERE login = '@alglive'")
-        connection.commit()
-
     cursor.execute('SELECT status FROM users WHERE login = ?', ("@"+login,))
     role = cursor.fetchone()
     cursor.execute('SELECT chat_id FROM users WHERE login = ?', ("@"+login,))
@@ -156,12 +155,34 @@ def get_chat_id(message):
     if role == None:
         bot.send_message(chat_id, "You are not allowed to use this command!")
 
-    if role[0] in ["ADMIN", "VOLUNTEER", "MODERATOR"]:
+    if role[0] in ["ADMIN", "MODERATOR"]:
             bot.send_message(private_chat_id[0], f"ID чата: \"{chat_id}\"")
             bot.send_message(chat_id, f"Chat-ID send to private chat!")
     else:
             bot.send_message(chat_id, "You are not allowed to use this command!")
 
+@bot.message_handler(commands=['update_roles'])
+def update_roles(message):
+    connection = sqlite3.connect('database.sql')
+    cursor = connection.cursor()
+    login = message.from_user.username
+    cursor.execute('SELECT status FROM users WHERE login = ?', ("@" + login,))
+    role = cursor.fetchone()
+    if role[0] in ["ADMIN", "MODERATOR"]:
+        def update_user_roles(role_list, role_name):
+            for user in role_list:
+                cursor.execute("UPDATE users SET status = ? WHERE login = ?", (role_name, '@' + user))
+
+      #  update_user_roles(roles['admins'], 'ADMIN')
+        update_user_roles(roles['moderators'], 'MODERATOR')
+        update_user_roles(roles['volunteers'], 'VOLUNTEER')
+
+        connection.commit()
+        cursor.close()
+        connection.close()
+        bot.send_message(message.chat.id, "Roles have been updated successfully!")
+    else:
+        bot.send_message(message.chat.id, "You are not allowed to use this command!")
 
 # Функция запроса выбора языка
 def ask_language(chat_id):

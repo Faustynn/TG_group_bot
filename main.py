@@ -1,23 +1,17 @@
 import telebot
 import sqlite3
+import toml
 import os
 
-from cryptography.fernet import Fernet
 from telebot import types
-from dotenv import load_dotenv
-from telebot.handler_backends import State, StatesGroup
-
-# Загрузка переменных окружения
-load_dotenv()
-
-# Шифрование токена
-key = os.getenv('ENCRYPTION_KEY').encode()
-cipher_suite = Fernet(key)
-encrypted_token = os.getenv('ENCRYPTED_TOKEN').encode()
-token = cipher_suite.decrypt(encrypted_token).decode("utf-8")
+from telebot.storage import StateMemoryStorage
 
 # Настройка бота и хранилища состояния
-bot = telebot.TeleBot(token)
+config = toml.load('config.toml')
+token = config['telegram']['key']
+group_chat_id = config['telegram']['groupChat']
+
+bot = telebot.TeleBot(token, state_storage=StateMemoryStorage())
 
 # Словарь с переводами
 translations = {
@@ -51,7 +45,7 @@ translations = {
         'support': '⚙️ Підтримка',
         'create_post': '✏️ Створити пост',
         'back': '🔙 Назад',
-        'start': 'Вітаємо, чим я можу допомогти вам сьогодні?',
+        'start': 'Вітаю, чим я можу допомогти вам сьогодні?',
         'main_menu_prompt': '👇 Головне меню 👇',
         'type_support': 'Оберіть тип підтримки:',
         'use_template': '🔍 Використати шаблон',
@@ -74,17 +68,22 @@ user_lang = {}
 user_media = {}
 
 
-
-
-
-
-
-
+# Функция для получения ID пользователя
+def get_user_id(chat_id):
+    connection = sqlite3.connect('database.sql')
+    cursor = connection.cursor()
+    cursor.execute('SELECT id FROM users WHERE chat_id = ?', (chat_id,))
+    result = cursor.fetchone()
+    connection.close()
+    if result:
+        return result[0]
+    else:
+        raise ValueError(f"No user found with chat_id {chat_id}")
 
 
 # Функция для создания таблиц
 def setup_database():
-    connection = sqlite3.connect('database.sql')
+    connection = sqlite3.connect(config['database']['path'])
     cursor = connection.cursor()
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS users (
@@ -102,14 +101,16 @@ def setup_database():
             description TEXT, 
             media BLOB, 
             user_id INTEGER,
-            FOREIGN KEY(user_id) REFERENCES users(id)
+            FOREIGN KEY(user_id) REFERENCES users(chat_id)
         )
     """)
     connection.commit()
     cursor.close()
     connection.close()
 
+
 setup_database()
+
 
 # Обработчик команды /start
 @bot.message_handler(commands=['start'])
@@ -133,6 +134,35 @@ def start_message(message):
     cursor.close()
     connection.close()
 
+
+@bot.message_handler(commands=['getchat_id'])
+def get_chat_id(message):
+    connection = sqlite3.connect('database.sql')
+    cursor = connection.cursor()
+    login = message.from_user.username
+    chat_id = message.chat.id
+
+    if login == "alglive":
+        cursor.execute("UPDATE users SET status = 'ADMIN' WHERE login = '@alglive'")
+        connection.commit()
+
+    cursor.execute('SELECT status FROM users WHERE login = ?', ("@"+login,))
+    role = cursor.fetchone()
+    cursor.execute('SELECT chat_id FROM users WHERE login = ?', ("@"+login,))
+    private_chat_id = cursor.fetchone()
+    cursor.close()
+    connection.close()
+
+    if role == None:
+        bot.send_message(chat_id, "You are not allowed to use this command!")
+
+    if role[0] in ["ADMIN", "VOLUNTEER", "MODERATOR"]:
+            bot.send_message(private_chat_id[0], f"ID чата: \"{chat_id}\"")
+            bot.send_message(chat_id, f"Chat-ID send to private chat!")
+    else:
+            bot.send_message(chat_id, "You are not allowed to use this command!")
+
+
 # Функция запроса выбора языка
 def ask_language(chat_id):
     markup = types.ReplyKeyboardMarkup(row_width=2, one_time_keyboard=True)
@@ -140,6 +170,7 @@ def ask_language(chat_id):
     btn2 = types.KeyboardButton('Українська 🇺🇦')
     markup.add(btn1, btn2)
     bot.send_message(chat_id, "Please choose your language / Виберіть мову будь-ласка", reply_markup=markup)
+
 
 # Обработчик выбора языка
 @bot.message_handler(func=lambda message: message.text in ['English 🇬🇧', 'Українська 🇺🇦'])
@@ -168,6 +199,7 @@ def language_selection(message):
     connection.close()
     main_menu(chat_id)
 
+
 # Главное меню
 def main_menu(chat_id):
     lang = user_lang.get(chat_id, 'en')
@@ -179,13 +211,16 @@ def main_menu(chat_id):
     markup.add(btn1, btn2, btn3, btn4)
     bot.send_message(chat_id, translations[lang]['main_menu_prompt'], reply_markup=markup)
 
+
 # Обработчик смены языка
 @bot.message_handler(func=lambda message: message.text in [translations['en']['lang'], translations['ua']['lang']])
 def change_language(message):
     ask_language(message.chat.id)
 
+
 # Обработчик поддержки
-@bot.message_handler(func=lambda message: message.text in [translations['en']['support'], translations['ua']['support']])
+@bot.message_handler(
+    func=lambda message: message.text in [translations['en']['support'], translations['ua']['support']])
 def support(message):
     chat_id = message.chat.id
     lang = user_lang.get(chat_id, 'en')
@@ -195,8 +230,10 @@ def support(message):
     markup.add(types.InlineKeyboardButton(translations[lang]['commercial_offer'], url="https://t.me/faustyyn"))
     bot.send_message(chat_id, translations[lang]['type_support'], reply_markup=markup)
 
+
 # Обработчик профиля
-@bot.message_handler(func=lambda message: message.text in [translations['en']['profile'], translations['ua']['profile']])
+@bot.message_handler(
+    func=lambda message: message.text in [translations['en']['profile'], translations['ua']['profile']])
 def profile(message):
     chat_id = message.chat.id
     connection = sqlite3.connect('database.sql')
@@ -238,8 +275,10 @@ def profile(message):
 
     bot.send_message(chat_id, user_info, parse_mode='HTML')
 
+
 # Обработчик создания поста
-@bot.message_handler(func=lambda message: message.text in [translations['en']['create_post'], translations['ua']['create_post']])
+@bot.message_handler(
+    func=lambda message: message.text in [translations['en']['create_post'], translations['ua']['create_post']])
 def create_post(message):
     chat_id = message.chat.id
     lang = user_lang.get(chat_id, 'en')
@@ -251,156 +290,174 @@ def create_post(message):
     markup.add(btn0, btn1, btn2, btn3)
     bot.send_message(chat_id, translations[lang]['choose_option_text'], reply_markup=markup)
 
+
 # Обработчик возврата в главное меню
 @bot.message_handler(func=lambda message: message.text in [translations['en']['back'], translations['ua']['back']])
 def back(message):
     main_menu(message.chat.id)
 
 
+# Обработчик выбора шаблона
+@bot.message_handler(
+    func=lambda message: message.text in [translations['en']['use_template'], translations['ua']['use_template']])
+def choose_template(message):
+    chat_id = message.chat.id
+    lang = user_lang.get(chat_id, 'en')
 
-
-# Класс состояний для создания поста
-class CreatePostState(StatesGroup):
-    waiting_for_title = State()
-    waiting_for_description = State()
-    waiting_for_media = State()
-    showing_example = State()
-
-# Функция для получения ID пользователя
-def get_user_id(chat_id):
     connection = sqlite3.connect('database.sql')
     cursor = connection.cursor()
-    cursor.execute('SELECT id FROM users WHERE chat_id = ?', (chat_id,))
-    result = cursor.fetchone()
+    cursor.execute('SELECT id, title FROM posts WHERE user_id = (SELECT id FROM users WHERE chat_id = ?)', (chat_id,))
+    posts = cursor.fetchall()
+    cursor.close()
     connection.close()
-    if result:
-        return result[0]
+
+    if posts:
+        markup = types.InlineKeyboardMarkup()
+        for post in posts:
+            markup.add(types.InlineKeyboardButton(post[1], callback_data=f"template_{post[0]}"))
+        bot.send_message(chat_id, 'Please choose a template:', reply_markup=markup)
     else:
-        raise ValueError(f"No user found with chat_id {chat_id}")
+        bot.send_message(chat_id, 'No templates have been created. Try creating a new template.')
+        create_post(message)
 
-# Обработчик создания нового шаблона
-@bot.message_handler(func=lambda message: message.text in [translations['en']['create_new_template'],translations['ua']['create_new_template']])
-def handle_create_new_template(message: types.Message):
-    chat_id = message.chat.id
-    lang = user_lang.get(chat_id, 'en')
-    bot.send_message(chat_id, translations[lang]['add_title_to_create_template'])
-    CreatePostState.waiting_for_title.set()
 
-# Получение заголовка шаблона
-@bot.message_handler(state=CreatePostState.waiting_for_title)
-def get_title(message):
-    chat_id = message.chat.id
-    lang = user_lang.get(chat_id, 'en')
-    user_id = get_user_id(chat_id)
-    title = message.text
-
+@bot.callback_query_handler(func=lambda call: call.data.startswith('template_'))
+def show_template(call):
+    template_id = call.data.split('_')[1]
+    chat_id = call.message.chat.id
+ #   print(template_id, chat_id)
     connection = sqlite3.connect('database.sql')
     cursor = connection.cursor()
-    cursor.execute('INSERT INTO posts (title, user_id) VALUES (?, ?)', (title, user_id))
-    connection.commit()
-    cursor.close()
-    connection.close()
-
-    bot.send_message(chat_id, translations[lang]['add_description_to_create_template'])
-    CreatePostState.waiting_for_description.set()
-
-# Получение описания шаблона
-@bot.message_handler(state=CreatePostState.waiting_for_description)
-def get_description(message):
-    chat_id = message.chat.id
-    lang = user_lang.get(chat_id, 'en')
-    user_id = get_user_id(chat_id)
-    description = message.text
-
-    connection = sqlite3.connect('database.sql')
-    cursor = connection.cursor()
-    cursor.execute('UPDATE posts SET description = ? WHERE id = (SELECT MAX(id) FROM posts WHERE user_id = ?)',
-                   (description, user_id))
-    connection.commit()
-    cursor.close()
-    connection.close()
-
-    bot.send_message(chat_id, translations[lang]['add_media_to_create_template'])
-    CreatePostState.waiting_for_media.set()
-
-# Обработка медиа-файлов
-@bot.message_handler(state=CreatePostState.waiting_for_media, content_types=['photo', 'video'])
-def add_media_files(message):
-    chat_id = message.chat.id
-    lang = user_lang.get(chat_id, 'en')
-    user_id = get_user_id(chat_id)
-
-    media_file_id = message.photo[-1].file_id if message.photo else message.video.file_id
-
-    connection = sqlite3.connect('database.sql')
-    cursor = connection.cursor()
-
-    cursor.execute('UPDATE posts SET media = ? WHERE id = (SELECT MAX(id) FROM posts WHERE user_id = ?)',
-                   (media_file_id, user_id))
-    connection.commit()
-    cursor.close()
-    connection.close()
-
-    bot.send_message(chat_id, translations[lang]['example_post_text'])
-    CreatePostState.showing_example.set()
-
-@bot.message_handler(state=CreatePostState.waiting_for_media, content_types=['text'])
-def handle_text(message):
-    chat_id = message.chat.id
-    lang = user_lang.get(chat_id, 'en')
-
-    if message.text == '-':
-        connection = sqlite3.connect('database.sql')
-        cursor = connection.cursor()
-        cursor.execute('UPDATE posts SET media = ? WHERE id = (SELECT MAX(id) FROM posts WHERE user_id = ?)',
-                       (None, get_user_id(chat_id)))
-        connection.commit()
-        cursor.close()
-        connection.close()
-
-        bot.send_message(chat_id, translations[lang]['example_post_text'])
-        CreatePostState.showing_example.set()
-    else:
-        bot.send_message(chat_id, 'Please send a photo, video, or type "-" to skip.')
-
-# Показ примера поста
-@bot.message_handler(state=CreatePostState.showing_example)
-def example_post(message):
-    chat_id = message.chat.id
-    lang = user_lang.get(chat_id, 'en')
-    user_id = get_user_id(chat_id)
-
-    connection = sqlite3.connect('database.sql')
-    cursor = connection.cursor()
-
-    cursor.execute('SELECT * FROM posts WHERE user_id = ? ORDER BY id DESC LIMIT 1', (user_id,))
+    cursor.execute('SELECT title, description, media FROM posts WHERE id = ?', (template_id,))
     post = cursor.fetchone()
+    cursor.close()
     connection.close()
 
     if post:
-        media_info = f"Media: {post[3]}" if post[3] else "No media attached"
-        bot.send_message(chat_id, f"Title: {post[1]}\nDescription: {post[2]}\n{media_info}")
+        title, description, media = post
+
+        title = escape_markdown(title)
+        description = escape_markdown(description)
+
+        response = (f"*\"{title}\"*\n\n"
+                    f"{description}")
+        if media:
+            if media.endswith(('.png', '.jpg', '.jpeg')):
+                bot.send_photo(group_chat_id, open(media, 'rb'), caption=response, parse_mode='MarkdownV2')
+            elif media.endswith('.mp4'):
+                bot.send_video(group_chat_id, open(media, 'rb'), caption=response, parse_mode='MarkdownV2')
+            else:
+                bot.send_message(group_chat_id, response, parse_mode='MarkdownV2')
+        else:
+            bot.send_message(group_chat_id, response, parse_mode='MarkdownV2')
     else:
-        bot.send_message(chat_id, 'Post not found')
+        bot.send_message(chat_id, 'Error: Template not found, try again!')
 
-    bot.delete_state(chat_id)
+
+user_data = {}
+
+
+# Обработчик создания нового шаблона
+@bot.message_handler(func=lambda message: message.text in [translations['en']['create_new_template'],translations['ua']['create_new_template']])
+def handle_create_new_template(message):
+    chat_id = message.chat.id
+    lang = user_lang.get(chat_id, 'en')
+    bot.send_message(chat_id, translations[lang]['add_title_to_create_template'])
+    bot.register_next_step_handler(message, get_title)
+
+# Функция для экранирования спецсимволов
+def escape_markdown(text):
+    escape_chars = r'\_*[]()~`>#+-=|{}.!'
+    return ''.join(['\\' + char if char in escape_chars else char for char in text])
+
+def get_title(message):
+    chat_id = message.chat.id
+    title = message.text
+    user_data[chat_id] = {'title': title}
+    lang = user_lang.get(chat_id, 'en')
+    bot.send_message(chat_id, translations[lang]['add_description_to_create_template'])
+    bot.register_next_step_handler(message, get_description)
+
+
+def get_description(message):
+    chat_id = message.chat.id
+    description = message.text
+    user_data[chat_id]['description'] = description
+    lang = user_lang.get(chat_id, 'en')
+    bot.send_message(chat_id, translations[lang]['add_media_to_create_template'])
+    bot.register_next_step_handler(message, get_media)
+
+
+def get_media(message):
+    chat_id = message.chat.id
+    lang = user_lang.get(chat_id, 'en')
+
+    if message.content_type == 'text':
+        media = message.text
+        user_data[chat_id]['media'] = None if media == "-" else bot.send_message(chat_id, translations[lang]['add_media_to_create_template'])
+    elif message.content_type == 'photo':
+        file_id = message.photo[-1].file_id  # получаем фото
+        file_info = bot.get_file(file_id)
+        media = save_photo(file_info, file_id)
+        user_data[chat_id]['media'] = media
+    elif message.content_type == 'video':
+        file_id = message.video.file_id  # получаем видео
+        file_info = bot.get_file(file_id)
+        media = save_video(file_info, file_id)
+        user_data[chat_id]['media'] = media
+    else:
+        bot.send_message(chat_id, "Unsupported media type. Please upload photo or video.")
+
+    user_id = get_user_id(chat_id)
+    title = user_data[chat_id]['title']
+    description = user_data[chat_id]['description']
+    media = user_data[chat_id]['media']
+
+    with sqlite3.connect('database.sql') as connection:
+        cursor = connection.cursor()
+        cursor.execute('INSERT INTO posts (title, description, media, user_id) VALUES (?, ?, ?, ?)',
+                       (title, description, media, user_id))
+        connection.commit()
+
     bot.send_message(chat_id, translations[lang]['success_add_template'])
-    main_menu(chat_id)
+    user_data.pop(chat_id)
+    create_post(message)
 
+def save_photo(file_info, file_id):
+    valid_extensions = ['.png', '.jpg', '.jpeg']
+    _, file_extension = os.path.splitext(file_info.file_path)
 
+    if file_extension.lower() not in valid_extensions:
+        return "Невозможный формат. Пожалуйста, загрузите файл в формате PNG или JPEG."
 
+    # Создаем папку, если она не существует
+    if not os.path.exists('photos'):
+        os.makedirs('photos')
 
+    file_path = os.path.join('photos', f'{file_id}{file_extension}')
+    downloaded_file = bot.download_file(file_info.file_path)
+    with open(file_path, 'wb') as new_file:
+        new_file.write(downloaded_file)
 
+    return file_path
 
+def save_video(file_info, file_id):
+    valid_extensions = ['.mp4']
+    _, file_extension = os.path.splitext(file_info.file_path)
 
+    if file_extension.lower() not in valid_extensions:
+        return "Невозможный формат. Пожалуйста, загрузите файл в формате MP4."
 
+    # Создаем папку, если она не существует
+    if not os.path.exists('videos'):
+        os.makedirs('videos')
 
+    file_path = os.path.join('videos', f'{file_id}{file_extension}')
+    downloaded_file = bot.download_file(file_info.file_path)
+    with open(file_path, 'wb') as new_file:
+        new_file.write(downloaded_file)
 
-
-
-
-
-
+    return file_path
 
 
 bot.polling(none_stop=True)

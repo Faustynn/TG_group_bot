@@ -2,3 +2,4 @@
 database.sql
 get-pip.py
 .venv
+storage/logs/*.*

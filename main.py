@@ -2,6 +2,8 @@ import telebot
 import sqlite3
 import toml
 import os
+import logging
+from logging.handlers import RotatingFileHandler
 
 from telebot import types
 from telebot.storage import StateMemoryStorage
@@ -94,6 +96,31 @@ translations = {
 user_lang = {}
 user_media = {}
 
+def setup_logging() -> None:
+    """
+    Sets up global logging
+    """
+    # get root logger
+    rootLogger = logging.getLogger("")
+    # create a rotating file handler with 1 backup file and 1 megabyte size
+    fileHandler = RotatingFileHandler(config["logging"]["path"], "wa", 1_000_000, 1, "UTF-8")
+    # create a default console handler
+    consoleHandler = logging.StreamHandler()
+    # create a formatting style (modified from hikari)
+    formatter = logging.Formatter(
+        fmt="%(levelname)-1.1s %(asctime)23.23s %(name)s @ %(lineno)d: %(message)s"
+    )
+    # add the formatter to both handlers
+    consoleHandler.setFormatter(formatter)
+    fileHandler.setFormatter(formatter)
+    # add both handlers to the root logger
+    rootLogger.addHandler(fileHandler)
+    rootLogger.addHandler(consoleHandler)
+    # set logging level whatever
+    rootLogger.setLevel(config["logging"]["level"])
+    rootLogger.info("Set up logging!")
+
+setup_logging()
 
 # Функция для получения ID пользователя
 def get_user_id(chat_id):

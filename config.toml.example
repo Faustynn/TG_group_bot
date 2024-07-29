@@ -1,0 +1,8 @@
+[telegram]
+key = "XXXX:YYYY" # telegram bot token, get from @BotFather
+groupChat = -123                                       # group chat ID, get with telegram dev mode
+[database]
+path = "database.sql" # path to the SQLite DB file
+[logging]
+path = "./storage/logs/main.log" # path to a file for the logs
+level = "DEBUG"         # severity settings for the logger

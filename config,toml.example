@@ -1,5 +1,0 @@
-[telegram]
-key = "YYYYYY:XXXXX"
-groupChat = -123
-[database]
-path = "database.sql"

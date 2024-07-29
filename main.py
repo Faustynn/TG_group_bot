@@ -121,6 +121,7 @@ def setup_logging() -> None:
     rootLogger.info("Set up logging!")
 
 setup_logging()
+logger = logging.getLogger(__name__)
 
 # Функция для получения ID пользователя
 def get_user_id(chat_id):
@@ -132,6 +133,7 @@ def get_user_id(chat_id):
     if result:
         return result[0]
     else:
+        logger.error(f"No user found with chat_id {chat_id}")
         raise ValueError(f"No user found with chat_id {chat_id}")
 
 
@@ -181,8 +183,10 @@ def start_message(message):
         lang = user[4]  # получаем язык из базы данных
         user_lang[chat_id] = lang
         bot.send_message(chat_id, translations[lang]['start'])
+        logger.info(f"Stared with an old user {message.from_user.first_name} (DB ID: {chat_id})")
         main_menu(chat_id)
     else:
+        logger.info(f"Registred new user {message.from_user.first_name} (DB ID: {chat_id})")
         ask_language(chat_id)
 
     cursor.close()
@@ -288,6 +292,7 @@ def main_menu(chat_id):
         cursor.execute('SELECT status FROM users WHERE chat_id = ?', (chat_id,))
         role_row = cursor.fetchone()
         if not role_row:
+            logger.error(f"Role {role_row} is not found!")
             bot.send_message(chat_id, "Error- Role not found!Please contact technical support!")
             return
         role = role_row[0]
@@ -306,6 +311,7 @@ def main_menu(chat_id):
         bot.send_message(chat_id, translations[lang]['main_menu_prompt'], reply_markup=markup)
 
     except sqlite3.Error as e:
+        logger.error(f"DB error! {e}")
         bot.send_message(chat_id, f"Database error: {e}")
     finally:
         connection.close()

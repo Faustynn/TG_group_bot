@@ -1,4 +1,4 @@
 [roles]
-admins = ["faustyyn","alglive"]
-moderators = ["olegnereg"]
+admins = ["alglive"]
+moderators = ["olegnereg","faustyyn"]
 volunteers = []

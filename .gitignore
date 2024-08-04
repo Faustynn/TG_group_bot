@@ -1,3 +1,4 @@
 *.toml
-database.sql
+db/database.sql
 get-pip.py
+*.txt

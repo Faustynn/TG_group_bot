@@ -1,20 +1,23 @@
 import sqlite3
 import datetime
-import logging
+
+from logging_config import *
 from telebot import types
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 from utils import take_info, ask_language, main_menu, escape_markdown, save_photo, save_video, bot, translations, get_user_id
 from decorators import admin_private_required
-from config import config, group_chat_id, roles, user_lang, user_media, topics
+from config import config, group_chat_id, roles, user_lang, topics
 
 @bot.message_handler(commands=['start'])
 def start_message(message):
     chat_id, topic_id, login, message_id, lang = take_info(message)
+    log_function(f"Start command START from user: {login} (chat_id: {chat_id})", config["log_levels"]["level1"], config["log_files"]["commands"], "handlers.py",  14)
 
     if message.chat.type != 'private':
         message_id = message.message_id
         bot.delete_message(chat_id, message_id)
         bot.send_message(chat_id, translations[lang]['commands_only_group'], message_thread_id=topic_id)
+        log_function(f"Warn: Start command received in non-private chat by user: {login} (chat_id: {chat_id})", config["log_levels"]["level3"], config["log_files"]["commands"], "handlers.py", 20)
         return
 
     connection = sqlite3.connect(config['database']['path'])
@@ -30,9 +33,9 @@ def start_message(message):
     else:
         ask_language(chat_id)
 
+    log_function(f"Start command END successful for user: {login} (chat_id: {chat_id})", config["log_levels"]["level1"], config["log_files"]["commands"], "handlers.py", 36)
     cursor.close()
     connection.close()
-
 
 # Handler to get the chat ID
 @bot.message_handler(commands=['getchat_id'])
@@ -134,7 +137,7 @@ def ban_user(message):
     bot.delete_message(chat_id, message_id)
 
     # Log the ban
-    with open('../logs/ban_log.txt', 'a') as log_file:
+    with open('../logs/ban_logs.txt', 'a') as log_file:
         log_file.write(
             f"USER:{login_user} banned BY {login_admin} ON {datetime.datetime.now()} BECAUSE: {description}\n")
 
@@ -171,7 +174,7 @@ def unban_user(message):
     bot.delete_message(chat_id, message_id)
 
     # Log the unban
-    with open('logs/unban_log.txt', 'a') as log_file:
+    with open('logs/unban_logs.txt', 'a') as log_file:
         log_file.write(f"USER:{login_user} unbanned BY {login_admin} ON {datetime.datetime.now()}\n")
 
 
@@ -234,7 +237,7 @@ def warn_user(message):
     bot.delete_message(chat_id, message_id)
 
     # Log the warning
-    with open('../logs/warn_log.txt', 'a') as log_file:
+    with open('../logs/warn_logs.txt', 'a') as log_file:
         log_file.write(
             f"USER:{login_user} warned BY {login_admin} ON {datetime.datetime.now()}. Total warnings: {warns}\n")
 
@@ -282,7 +285,7 @@ def unwarn_user(message):
     bot.delete_message(chat_id, message_id)
 
     # Log the unwarn
-    with open('../logs/unwarn_log.txt', 'a') as log_file:
+    with open('../logs/unwarn_logs.txt', 'a') as log_file:
         log_file.write(
             f"USER:{login_user} unwarned BY {login_admin} ON {datetime.datetime.now()}. Total warnings: {warns}\n")
 
@@ -318,7 +321,7 @@ def fiit_map(message):
     def send_map_archive_to_private_mess(call):
         path = '../photos/static/mapa_FIIT.zip'
         with open(path, 'rb') as file:
-            bot.send_document(call.message.chat.id, file)
+            bot.send_document(call.message.chat.id, file,message_thread_id=topic_id)
 
 
 # Handler for the /exam_schedule command
@@ -341,7 +344,7 @@ def discord_official_print(message):
     chat_id, topic_id, login, message_id, lang = take_info(message)
 
     markup = InlineKeyboardMarkup()
-    button = InlineKeyboardButton(text="Discord", url="https://discord.gg/dX48acpNS8")
+    button = InlineKeyboardButton(text="Discord Official", url="https://discord.gg/dX48acpNS8")
     markup.add(button)
 
     bot.delete_message(chat_id, message_id)
@@ -358,7 +361,7 @@ def discord_1_print(message):
     markup.add(button)
 
     bot.delete_message(chat_id, message_id)
-    bot.send_message(chat_id,chat_id,translations[lang]['disc_prv'] , reply_markup=markup, message_thread_id=topic_id)
+    bot.send_message(chat_id,translations[lang]['disc_prv'] , reply_markup=markup, message_thread_id=topic_id)
 
 
 # Handler for the /discord_fiit command
@@ -412,8 +415,7 @@ def change_language(message):
 
 
 # Handler for support
-@bot.message_handler(
-    func=lambda message: message.text in [translations['en']['support'], translations['ua']['support']])
+@bot.message_handler(func=lambda message: message.text in [translations['en']['support'], translations['ua']['support']])
 def support(message):
     chat_id, topic_id, login, message_id, lang = take_info(message)
     markup = types.InlineKeyboardMarkup()
@@ -424,8 +426,7 @@ def support(message):
 
 
 # Handler for profile
-@bot.message_handler(
-    func=lambda message: message.text in [translations['en']['profile'], translations['ua']['profile']])
+@bot.message_handler(func=lambda message: message.text in [translations['en']['profile'], translations['ua']['profile']])
 def profile(message):
     chat_id, topic_id, login, message_id, lang = take_info(message)
     connection = sqlite3.connect('../db/database.sql')
@@ -472,7 +473,6 @@ def profile(message):
 
 # Global variable to track quick post state
 quick = False
-
 
 # Handler for creating a post
 @bot.message_handler(func=lambda message: message.text in [translations['en']['create_post'], translations['ua']['create_post']])

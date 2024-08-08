@@ -1,7 +1,8 @@
 import sqlite3
 import os
 from telebot import TeleBot, types
-from config import config, group_chat_id, roles, user_lang, user_media
+from config import config, user_lang
+from logging_config import *
 
 # Initialize the bot with the token from the config
 bot = TeleBot(config['telegram']['key'])
@@ -134,6 +135,7 @@ def main_menu(chat_id):
         cursor.execute('SELECT status FROM users WHERE chat_id = ?', (chat_id,))
         role_row = cursor.fetchone()
         if not role_row:
+            log_function(f"Role not found in database with chat_id {chat_id}", config["log_levels"]["level2"], config["log_files"]["database"],"utils.py", 138)
             bot.send_message(chat_id, "Error- Role not found!Please contact technical support!")
             return
         role = role_row[0]
@@ -218,4 +220,4 @@ def get_user_id(chat_id):
     if result:
         return result[0]
     else:
-        raise ValueError(f"No user found with chat_id {chat_id}")
+        log_function(f"No user found with chat_id {chat_id}", config["log_levels"]["level3"], config["log_files"]["database"],"utils.py", 223)

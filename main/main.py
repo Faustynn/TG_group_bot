@@ -56,6 +56,23 @@ translations = {
         'delete_template': '🗑️ Delete template',
         're_delete': 'Are you sure you want to delete the template?',
         'success_delete_template': 'Template deleted successfully',
+        'commands_only_group': 'Commands are only available in a private chat!',
+        'admin_requirement': 'This command can only be used by administrators or moderators!',
+        'chat_id_sent': 'Chat ID has been successfully sent to the private chat!',
+        'err': 'Unfortunately, a technical error occurred, please try again! Or report this to technical support!',
+        'role_update_success': 'Roles have been successfully updated!',
+        'department_link': 'Go to the university schedule website:',
+        'fiit_map': 'FIIT Map:',
+        'exam_schedule': 'Go to the exam schedule website:',
+        'disc_off': 'Official STU FIIT Discord:',
+        'disc_prv': 'Discord created by freshmen:',
+        'topic': 'Please choose a topic:',
+        'no_templates': 'No templates have been created. Try creating a new template.',
+        'error_no_template_selected': 'Error: Template not found, try again!',
+        'cancel_delete_template': 'Template deletion canceled!',
+        'err_media_type': 'Unsupported media type. Please upload photo or video.',
+        'template_limit_reached': 'You have reached the limit of templates!',
+        'invalid_format': 'Invalid format. Please upload a file in PNG or JPEG format',
     },
     'ua': {
         'main_menu': 'Головне меню',
@@ -80,7 +97,6 @@ translations = {
         'success_add_template': 'Шаблон створено успішно!',
         'example_post_text': 'Приклад вашого шаблону:',
         'edit_post': '🖊 Редагувати шаблон:',
-        'choose_edit': 'Оберіть, що ви хочете відредагувати:',
         'edit_title': 'Назва',
         'edit_description': 'Опис',
         'edit_media': 'Медіа дані',
@@ -91,6 +107,24 @@ translations = {
         'delete_template': '🗑️ Видалити шаблон',
         're_delete': 'Ви впевнені, що хочете видалити шаблон?',
         'success_delete_template': 'Шаблон успішно видалено!',
+        'commands_only_group': 'Команди доступні тільки в особистому чаті!',
+        'admin_requirement': 'Цю команду можуть використовувати тільки адміністратори або модератори!',
+        'chat_id_sent': 'Айді чата було успішно відправлено в особистий чат!',
+        'err': 'На жаль, сталася технічна помилка, спробуйте ще раз! Або повідомте про це технічну підтримку!',
+        'role_update_success': 'Ролі були успішно оновлені!',
+        'department_link': 'Перейти на сайт з розкладом університету:',
+        'fiit_map': 'Карта FIIT:',
+        'exam_schedule': 'Перейти на сайт з розкладом екзаменів:',
+        'disc_off': 'Офіційний дискорд STU FIIT:',
+        'disc_prv': 'Дискорд створений першокурсниками:',
+        'topic': 'Будь ласка, виберіть тему:',
+        'choose_edit': 'Будь ласка, виберіть шаблон для редагування:',
+        'no_templates': 'Шаблони не були створені. Спробуйте створити новий шаблон.',
+        'error_no_template_selected': 'Помилка: Шаблон не знайдено, спробуйте ще раз!',
+        'cancel_delete_template': 'Видалення шаблону скасовано!',
+        'err_media_type': 'Непідтримуваний тип медіа. Будь ласка, завантажте фото або відео.',
+        'template_limit_reached': 'Ви досягли ліміту шаблонів!',
+        'invalid_format': 'Неможливий формат. Будь ласка, завантажте файл у форматі PNG або JPEG',
     }
 }
 
@@ -146,14 +180,13 @@ setup_database()
 
 
 # Decorator to ensure the user is an admin
-def admin_required(f):
+def admin_private_required(f):
     @wraps(f)
     def decorated_function(message, *args, **kwargs):
-        chat_id = message.chat.id
-        topic_id = message.message_thread_id if hasattr(message, 'message_thread_id') else None
+        chat_id, topic_id, login, message_id, lang = take_info(message)
 
         if message.chat.type == 'private':
-            bot.send_message(chat_id, "Команды доступны только в групповом чате!")
+            bot.send_message(chat_id, translations[lang]['commands_only_group'])
             return
 
         user_id = message.from_user.id
@@ -165,14 +198,12 @@ def admin_required(f):
             role_row = cursor.fetchone()
 
         if not role_row or role_row[0] not in ["ADMIN", "MODERATOR"]:
-            bot.send_message(chat_id, "Эту команду могут использовать только администраторы или модераторы!",
-                             message_thread_id=topic_id)
+            bot.send_message(chat_id, translations[lang]['admin_requirement'],message_thread_id=topic_id)
             return
 
         chat_admins = bot.get_chat_administrators(chat_id)
         if user_id not in [admin.user.id for admin in chat_admins]:
-            bot.send_message(chat_id, "Эту команду могут использовать только администраторы или модераторы!",
-                             message_thread_id=topic_id)
+            bot.send_message(chat_id, translations[lang]['admin_requirement'],message_thread_id=topic_id)
             return
 
         return f(message, *args, **kwargs)
@@ -186,19 +217,19 @@ def take_info(message):
     topic_id = message.message_thread_id if hasattr(message, 'message_thread_id') else None
     login = message.from_user.username
     message_id = message.message_id
-    return chat_id, topic_id, login, message_id
+    lang = user_lang.get(chat_id, 'en')
+    return chat_id, topic_id, login, message_id, lang
 
 
 # Handler for the /start command
 @bot.message_handler(commands=['start'])
 def start_message(message):
-    chat_id = message.chat.id
-    topic_id = message.message_thread_id if hasattr(message, 'message_thread_id') else None
+    chat_id, topic_id, login, message_id, lang = take_info(message)
 
     if message.chat.type != 'private':
         message_id = message.message_id
         bot.delete_message(chat_id, message_id)
-        bot.send_message(chat_id, "Commands are only available in private chat!", message_thread_id=topic_id)
+        bot.send_message(chat_id, translations[lang]['commands_only_group'], message_thread_id=topic_id)
         return
 
     # Check if the user is in the database
@@ -221,16 +252,12 @@ def start_message(message):
 
 # Handler to get the chat ID
 @bot.message_handler(commands=['getchat_id'])
+@admin_private_required
 def get_chat_id(message):
+    chat_id, topic_id, login, message_id, lang = take_info(message)
     try:
         connection = sqlite3.connect('../db/database.sql')
         cursor = connection.cursor()
-
-        chat_id, topic_id, login, message_id = take_info(message)
-
-        if message.chat.type == 'private':
-            bot.send_message(chat_id, "Commands are only available in group chat!", message_thread_id=topic_id)
-            return
 
         cursor.execute('SELECT status FROM users WHERE login = ?', ("@" + login,))
         role_row = cursor.fetchone()
@@ -239,65 +266,57 @@ def get_chat_id(message):
         connection.close()
 
         if role_row:
-            role = role_row[0]
-            if role in ["ADMIN", "MODERATOR"]:
-                if private_chat_id_row:
-                    private_chat_id = private_chat_id_row[0]
-                    bot.send_message(private_chat_id, f"ID чата: \"{chat_id}\"\n ID топика: \"{topic_id}\"")
-                    bot.send_message(chat_id, "Chat-ID sent to private chat!", message_thread_id=topic_id)
-                else:
-                    bot.send_message(chat_id, "Error: User not found!", message_thread_id=topic_id)
+            if private_chat_id_row:
+                private_chat_id = private_chat_id_row[0]
+                bot.send_message(private_chat_id, f"ID chat: \"{chat_id}\"\n ID topic: \"{topic_id}\"")
+                bot.send_message(chat_id, translations[lang]['chat_id_sent'], message_thread_id=topic_id)
             else:
-                bot.send_message(chat_id, "You are not allowed to use this command!", message_thread_id=topic_id)
+                pass
+                #logging Error: User not found!
         else:
-            bot.send_message(chat_id, "Error: User not found in the database!", message_thread_id=topic_id)
+            pass
+             #logging Error: User not found in the database!
 
         bot.delete_message(chat_id, message_id)
     except Exception as e:
         logging.error(f"An error occurred: {e}")
         bot.delete_message(chat_id, message_id)
-        bot.send_message(chat_id, "An error occurred while processing your request.", message_thread_id=topic_id)
+        bot.send_message(chat_id, translations[lang]['err'], message_thread_id=topic_id)
 
 
 # Handler to update roles
 @bot.message_handler(commands=['update_roles'])
+@admin_private_required
 def update_roles(message):
-    connection = sqlite3.connect('../db/database.sql')
-    cursor = connection.cursor()
+    chat_id, topic_id, login, message_id, lang = take_info(message)
+    try:
+        connection = sqlite3.connect('../db/database.sql')
+        cursor = connection.cursor()
 
-    chat_id, topic_id, login, message_id = take_info(message)
-
-    cursor.execute('SELECT status FROM users WHERE login = ?', ("@" + login,))
-    role_row = cursor.fetchone()
-
-    role = role_row[0] if role_row else bot.send_message(chat_id, "You are not allowed to use this command!",
-                                                         message_thread_id=topic_id)
-
-    if role in ["ADMIN", "MODERATOR"]:
         def update_user_roles(role_list, role_name):
             for user in role_list:
                 cursor.execute("UPDATE users SET status = ? WHERE login = ?", (role_name, '@' + user))
-
         update_user_roles(roles['admins'], 'ADMIN')
         update_user_roles(roles['moderators'], 'MODERATOR')
         update_user_roles(roles['volunteers'], 'VOLUNTEER')
 
-        cursor.execute("UPDATE users SET status = 'USER' WHERE login NOT IN ({})".format(
-            ','.join(['?' for _ in roles['admins'] + roles['moderators'] + roles['volunteers']])),
-                       ['@' + user for user in roles['admins'] + roles['moderators'] + roles['volunteers']])
+        cursor.execute("UPDATE users SET status = 'USER' WHERE login NOT IN ({})".format(','.join(['?' for _ in roles['admins'] + roles['moderators'] + roles['volunteers']])),['@' + user for user in roles['admins'] + roles['moderators'] + roles['volunteers']])
 
         connection.commit()
         cursor.close()
         connection.close()
         bot.delete_message(chat_id, message_id)
-        bot.send_message(chat_id, "Roles have been updated successfully!", message_thread_id=topic_id)
-
+        bot.send_message(chat_id, translations[lang]['role_update_success'], message_thread_id=topic_id)
+    except Exception as e:
+        logging.error(f"An error occurred: {e}")
+        bot.delete_message(chat_id, message_id)
+        bot.send_message(chat_id, translations[lang]['err'], message_thread_id=topic_id)
 
 # Handler to ban a user
 @bot.message_handler(commands=['ban'])
-@admin_required
+@admin_private_required
 def ban_user(message):
-    chat_id, topic_id, login_admin, message_id = take_info(message)
+    chat_id, topic_id, login_admin, message_id, lang = take_info(message)
 
     if not message.reply_to_message:
         bot.send_message(chat_id, "Please reply to the user's message you want to ban!", message_thread_id=topic_id)
@@ -327,8 +346,7 @@ def ban_user(message):
 
     # Ban the user
     bot.ban_chat_member(chat_id, user_id)
-    bot.send_message(chat_id, f"User {login_user} has been banned successfully for: {description}",
-                     message_thread_id=topic_id)
+    bot.send_message(chat_id, f"User {login_user} has been banned successfully for: {description}",message_thread_id=topic_id)
     bot.delete_message(chat_id, message_id)
 
     # Log the ban
@@ -339,9 +357,9 @@ def ban_user(message):
 
 # Handler to unban a user
 @bot.message_handler(commands=['unban'])
-@admin_required
+@admin_private_required
 def unban_user(message):
-    chat_id, topic_id, login_admin, message_id = take_info(message)
+    chat_id, topic_id, login_admin, message_id, lang = take_info(message)
 
     if not message.reply_to_message:
         bot.send_message(chat_id, "Please reply to the user's message you want to unban!", message_thread_id=topic_id)
@@ -375,9 +393,9 @@ def unban_user(message):
 
 # Handler to warn a user
 @bot.message_handler(commands=['warn'])
-@admin_required
+@admin_private_required
 def warn_user(message):
-    chat_id, topic_id, login_admin, message_id = take_info(message)
+    chat_id, topic_id, login_admin, message_id, lang = take_info(message)
 
     if not message.reply_to_message:
         bot.send_message(chat_id, "Please reply to the user's message you want to warn!", message_thread_id=topic_id)
@@ -439,9 +457,9 @@ def warn_user(message):
 
 # Handler to unwarn a user
 @bot.message_handler(commands=['unwarn'])
-@admin_required
+@admin_private_required
 def unwarn_user(message):
-    chat_id, topic_id, login_admin, message_id = take_info(message)
+    chat_id, topic_id, login_admin, message_id, lang = take_info(message)
 
     if not message.reply_to_message:
         bot.send_message(chat_id, "Please reply to the user's message you want to unwarn!", message_thread_id=topic_id)
@@ -488,7 +506,7 @@ def unwarn_user(message):
 # Handler for the /department_fiit command
 @bot.message_handler(commands=['department_fiit'])
 def study_dep(message):
-    chat_id, topic_id, login, message_id = take_info(message)
+    chat_id, topic_id, login, message_id, lang = take_info(message)
 
     markup = InlineKeyboardMarkup()
     button = InlineKeyboardButton(text="Study Department",
@@ -496,13 +514,13 @@ def study_dep(message):
     markup.add(button)
 
     bot.delete_message(chat_id, message_id)
-    bot.send_message(chat_id, "Перейти на сайт с расписанием универа:", reply_markup=markup, message_thread_id=topic_id)
+    bot.send_message(chat_id, translations[lang]['department_link'], reply_markup=markup, message_thread_id=topic_id)
 
 
 # Handler for the /fiit_map command
 @bot.message_handler(commands=['fiit_map'])
 def fiit_map(message):
-    chat_id, topic_id, login, message_id = take_info(message)
+    chat_id, topic_id, login, message_id, lang = take_info(message)
 
     markup = InlineKeyboardMarkup()
     button1 = InlineKeyboardButton(text="See Online", url="http://stavba.fiit.stuba.sk/mapa/")
@@ -510,7 +528,7 @@ def fiit_map(message):
     markup.add(button1, button2)
 
     bot.delete_message(chat_id, message_id)
-    bot.send_message(chat_id, "Карта FIIT:", reply_markup=markup, message_thread_id=topic_id)
+    bot.send_message(chat_id, translations[lang]['fiit_map'], reply_markup=markup, message_thread_id=topic_id)
 
     @bot.callback_query_handler(func=lambda call: call.data == 'download_map')
     def send_map_archive_to_private_mess(call):
@@ -522,41 +540,41 @@ def fiit_map(message):
 # Handler for the /exam_schedule command
 @bot.message_handler(commands=['exam_schedule'])
 def exam_schedule(message):
-    chat_id, topic_id, login, message_id = take_info(message)
+    chat_id, topic_id, login, message_id, lang = take_info(message)
 
     markup = InlineKeyboardMarkup()
     button = InlineKeyboardButton(text="Exam Schedule", url="https://www.fiit.stuba.sk/rozvrhy.html?page_id=1697")
     markup.add(button)
 
     bot.delete_message(chat_id, message_id)
-    bot.send_message(chat_id, "Перейти на сайт с расписанием екзаменами:", reply_markup=markup,
+    bot.send_message(chat_id, translations[lang]['exam_schedule'], reply_markup=markup,
                      message_thread_id=topic_id)
 
 
 # Handler for the /discord_off command
 @bot.message_handler(commands=['discord_off'])
 def discord_official_print(message):
-    chat_id, topic_id, login, message_id = take_info(message)
+    chat_id, topic_id, login, message_id, lang = take_info(message)
 
     markup = InlineKeyboardMarkup()
     button = InlineKeyboardButton(text="Discord", url="https://discord.gg/dX48acpNS8")
     markup.add(button)
 
     bot.delete_message(chat_id, message_id)
-    bot.send_message(chat_id, "Официальный дискорд STU FIIT:", reply_markup=markup, message_thread_id=topic_id)
+    bot.send_message(chat_id,translations[lang]['disc_off'] , reply_markup=markup, message_thread_id=topic_id)
 
 
 # Handler for the /discord_tw command
 @bot.message_handler(commands=['discord_tw'])
 def discord_1_print(message):
-    chat_id, topic_id, login, message_id = take_info(message)
+    chat_id, topic_id, login, message_id, lang = take_info(message)
 
     markup = InlineKeyboardMarkup()
     button = InlineKeyboardButton(text="Discord", url="https://discord.gg/m7cRUMPM35")
     markup.add(button)
 
     bot.delete_message(chat_id, message_id)
-    bot.send_message(chat_id, "Дискорд созданый первогодками:", reply_markup=markup, message_thread_id=topic_id)
+    bot.send_message(chat_id,chat_id,translations[lang]['disc_prv'] , reply_markup=markup, message_thread_id=topic_id)
 
 
 # Handler for the /discord_fiit command
@@ -568,7 +586,7 @@ def support_print(message):
 # Handler for the /discord_fiit command
 @bot.message_handler(commands=['mladost_map'])
 def mladost_map(message):
-    chat_id, topic_id, login, message_id = take_info(message)
+    chat_id, topic_id, login, message_id, lang = take_info(message)
 
     bot.delete_message(chat_id, message_id)
     bot.send_photo(chat_id, open('../photos/static/mapa_mladost.jpg', 'rb'), message_thread_id=topic_id)
@@ -656,8 +674,7 @@ def change_language(message):
 @bot.message_handler(
     func=lambda message: message.text in [translations['en']['support'], translations['ua']['support']])
 def support(message):
-    chat_id, topic_id, login, message_id = take_info(message)
-    lang = user_lang.get(chat_id, 'en')
+    chat_id, topic_id, login, message_id, lang = take_info(message)
     markup = types.InlineKeyboardMarkup()
     markup.add(types.InlineKeyboardButton(translations[lang]['tech_support'], url="https://t.me/faustyyn"))
     markup.add(types.InlineKeyboardButton(translations[lang]['community_support'], url="https://t.me/faustyyn"))
@@ -669,7 +686,7 @@ def support(message):
 @bot.message_handler(
     func=lambda message: message.text in [translations['en']['profile'], translations['ua']['profile']])
 def profile(message):
-    chat_id = message.chat.id
+    chat_id, topic_id, login, message_id, lang = take_info(message)
     connection = sqlite3.connect('../db/database.sql')
     cursor = connection.cursor()
     cursor.execute('SELECT * FROM users WHERE chat_id = ?', (chat_id,))
@@ -717,8 +734,7 @@ quick = False
 
 
 # Handler for creating a post
-@bot.message_handler(
-    func=lambda message: message.text in [translations['en']['create_post'], translations['ua']['create_post']])
+@bot.message_handler(func=lambda message: message.text in [translations['en']['create_post'], translations['ua']['create_post']])
 def create_post(message):
     global quick
     quick = False
@@ -776,7 +792,7 @@ def show_template(call):
     for topic_name, topic_id in topics.items():
         button = types.KeyboardButton(topic_name)
         markup.add(button)
-    bot.send_message(chat_id, "Please choose a topic:", reply_markup=markup)
+    bot.send_message(chat_id, translations[lang]['topic'], reply_markup=markup)
 
     # Step 2: Handle topic selection
     @bot.message_handler(func=lambda message: message.text in topics.keys())
@@ -807,8 +823,7 @@ def show_template(call):
 
 
 # Handler for quick post creation
-@bot.message_handler(
-    func=lambda message: message.text in [translations['en']['quick_post'], translations['ua']['quick_post']])
+@bot.message_handler(func=lambda message: message.text in [translations['en']['quick_post'], translations['ua']['quick_post']])
 def quick_post(message):
     global quick
     quick = True
@@ -819,8 +834,7 @@ def quick_post(message):
 
 
 # Handler for editing a post
-@bot.message_handler(
-    func=lambda message: message.text in [translations['en']['edit_post'], translations['ua']['edit_post']])
+@bot.message_handler(func=lambda message: message.text in [translations['en']['edit_post'], translations['ua']['edit_post']])
 def edit_post(message):
     chat_id = message.chat.id
     lang = user_lang.get(chat_id, 'en')
@@ -836,9 +850,9 @@ def edit_post(message):
         markup = types.InlineKeyboardMarkup()
         for post in posts:
             markup.add(types.InlineKeyboardButton(post[1], callback_data=f"edit_{post[0]}"))
-        bot.send_message(chat_id, 'Please choose a template to edit:', reply_markup=markup)
+        bot.send_message(chat_id, translations[lang]['choose_edit'], reply_markup=markup)
     else:
-        bot.send_message(chat_id, 'No templates have been created. Try creating a new template.')
+        bot.send_message(chat_id, translations[lang]['no_templates'])
         create_post(message)
 
 
@@ -916,9 +930,9 @@ def confirm_delete_template(message):
             connection.close()
             bot.send_message(chat_id, translations[lang]['success_delete_template'])
         else:
-            bot.send_message(chat_id, 'Error: Template not found, try again!')
+            bot.send_message(chat_id, translations[lang]['error_no_template_selected'])
     elif message.text.upper() == 'NO':
-        bot.send_message(chat_id, 'Deletion canceled.')
+        bot.send_message(chat_id, translations[lang]['cancel_delete_template'])
     create_post(message)
 
 
@@ -972,23 +986,23 @@ def edit_description(message):
 def edit_media(message):
     chat_id = message.chat.id
     lang = user_lang.get(chat_id, 'en')
+    media = None
 
     if message.content_type == 'text':
         media = message.text
-        user_data[chat_id]['media'] = None if media == "-" else bot.send_message(chat_id, translations[lang][
-            'add_media_to_create_template'])
+        user_data[chat_id]['media'] = None if media == "-" else bot.send_message(chat_id, translations[lang]['add_media_to_create_template'])
     elif message.content_type == 'photo':
         file_id = message.photo[-1].file_id  # Get the photo
         file_info = bot.get_file(file_id)
-        media = save_photo(file_info, file_id)
+        media = save_photo(file_info, file_id, lang)
         user_data[chat_id]['media'] = media
     elif message.content_type == 'video':
         file_id = message.video.file_id  # Get the video
         file_info = bot.get_file(file_id)
-        media = save_video(file_info, file_id)
+        media = save_video(file_info, file_id, lang)
         user_data[chat_id]['media'] = media
     else:
-        bot.send_message(chat_id, "Unsupported media type. Please upload photo or video.")
+        bot.send_message(chat_id, translations[lang]['err_media_type'])
 
     user_id = get_user_id(chat_id)
     connection = sqlite3.connect('../db/database.sql')
@@ -1007,8 +1021,7 @@ user_data = {}
 
 
 # Handler for creating a new template
-@bot.message_handler(func=lambda message: message.text in [translations['en']['create_new_template'],
-                                                           translations['ua']['create_new_template']])
+@bot.message_handler(func=lambda message: message.text in [translations['en']['create_new_template'],translations['ua']['create_new_template']])
 def handle_create_new_template(message):
     chat_id = message.chat.id
     lang = user_lang.get(chat_id, 'en')
@@ -1030,7 +1043,7 @@ def handle_create_new_template(message):
         bot.send_message(chat_id, translations[lang]['add_title_to_create_template'])
         bot.register_next_step_handler(message, get_title)
     else:
-        bot.send_message(chat_id, f"You have reached the limit of templates! ({number_of_templates})")
+        bot.send_message(chat_id, translations[lang]['template_limit_reached'] % number_of_templates)
 
 
 # Function to escape special characters for Markdown
@@ -1061,25 +1074,23 @@ def get_description(message):
 
 # Function to get the media from the user
 def get_media(message):
-    chat_id = message.chat.id
-    lang = user_lang.get(chat_id, 'en')
+    chat_id, topic_id, login, message_id, lang = take_info(message)
 
     if message.content_type == 'text':
         media = message.text
-        user_data[chat_id]['media'] = None if media == "-" else bot.send_message(chat_id, translations[lang][
-            'add_media_to_create_template'])
+        user_data[chat_id]['media'] = None if media == "-" else bot.send_message(chat_id, translations[lang]['add_media_to_create_template'])
     elif message.content_type == 'photo':
         file_id = message.photo[-1].file_id  # Get the photo
         file_info = bot.get_file(file_id)
-        media = save_photo(file_info, file_id)
+        media = save_photo(file_info, file_id, lang)
         user_data[chat_id]['media'] = media
     elif message.content_type == 'video':
         file_id = message.video.file_id  # Get the video
         file_info = bot.get_file(file_id)
-        media = save_video(file_info, file_id)
+        media = save_video(file_info, file_id, lang)
         user_data[chat_id]['media'] = media
     else:
-        bot.send_message(chat_id, "Unsupported media type. Please upload photo or video.")
+        bot.send_message(chat_id, translations[lang]['err_media_type'])
 
     user_id = get_user_id(chat_id)
     title = user_data[chat_id]['title']
@@ -1115,12 +1126,12 @@ def get_media(message):
 
 
 # Function to save photo
-def save_photo(file_info, file_id):
+def save_photo(file_info, file_id, lang):
     valid_extensions = ['.png', '.jpg', '.jpeg']
     _, file_extension = os.path.splitext(file_info.file_path)
 
     if file_extension.lower() not in valid_extensions:
-        return "Невозможный формат. Пожалуйста, загрузите файл в формате PNG или JPEG."
+        return translations[lang]['invalid_format']
 
     # Create folder if it doesn't exist
     if not os.path.exists('../photos'):
@@ -1135,12 +1146,12 @@ def save_photo(file_info, file_id):
 
 
 # Function to save video
-def save_video(file_info, file_id):
+def save_video(file_info, file_id, lang):
     valid_extensions = ['.mp4']
     _, file_extension = os.path.splitext(file_info.file_path)
 
     if file_extension.lower() not in valid_extensions:
-        return "Невозможный формат. Пожалуйста, загрузите файл в формате MP4."
+        return translations[lang]['invalid_format']
 
     # Create folder if it doesn't exist
     if not os.path.exists('../videos'):

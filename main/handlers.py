@@ -859,3 +859,38 @@ def get_media(message):
 
     user_data.pop(chat_id)
     create_post(message)
+
+
+# Handler for the /global-discord command
+@bot.message_handler(commands=['gl_discord'])
+def global_discord(message):
+    chat_id, topic_id, login, message_id, lang = take_info(message)
+
+    markup = InlineKeyboardMarkup()
+    button = InlineKeyboardButton(text="Global FIIT | Discord",
+                                  url="https://discord.gg/NSr5pScq2y")
+    markup.add(button)
+
+    bot.delete_message(chat_id, message_id)
+    bot.send_message(chat_id, translations[lang]['gl_discrd'], reply_markup=markup, message_thread_id=topic_id)
+
+
+# Handler for the /minecraft_server command
+@bot.message_handler(commands=['minecraft_server'])
+def minecraft_serv(message):
+    chat_id, topic_id, login, message_id, lang = take_info(message)
+
+    #test info
+    server_ip = "Example IP"
+    server_core = "Forge 1.21"
+    mods_download_link = "https://t.me/fiitstu"
+
+    server_info = (f"{translations[lang]['minecraft_server_info']}\n"
+                   f"IP: {server_ip}\n"
+                   f"Core: {server_core}")
+    markup = InlineKeyboardMarkup()
+    button = InlineKeyboardButton(text=translations[lang]['download_mods'], url=mods_download_link)
+    markup.add(button)
+
+    bot.delete_message(chat_id, message_id)
+    bot.send_message(chat_id, server_info, reply_markup=markup, message_thread_id=topic_id)

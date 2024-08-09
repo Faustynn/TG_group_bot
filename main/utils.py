@@ -59,6 +59,9 @@ translations = {
         'err_media_type': 'Unsupported media type. Please upload photo or video.',
         'template_limit_reached': 'You have reached the limit of templates!',
         'invalid_format': 'Invalid format. Please upload a file in PNG or JPEG format',
+        'gl_discrd': 'Discord group of this chat:',
+        'minecraft_server_info': 'Minecraft server information:',
+        'download_mods': 'Click to download mods:',
     },
     'ua': {
         'main_menu': 'Головне меню',
@@ -111,6 +114,9 @@ translations = {
         'err_media_type': 'Непідтримуваний тип медіа. Будь ласка, завантажте фото або відео.',
         'template_limit_reached': 'Ви досягли ліміту шаблонів!',
         'invalid_format': 'Неможливий формат. Будь ласка, завантажте файл у форматі PNG або JPEG',
+        'gl_discrd': 'Діскорд група цього чату:',
+        'minecraft_server_info': 'Інформація про сервер Minecraft:',
+        'download_mods': 'Натисніть, щоб завантажити моди:',
     }
 }
 

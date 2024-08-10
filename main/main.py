@@ -3,9 +3,11 @@ from utils import *
 from config import *
 from decorators import *
 from handlers import *
-from logging_config import *
+from logging_config import setup_logging
 
 if __name__ == "__main__":
+    setup_logging()
+    logger = logging.getLogger(__name__)
     setup_database()
-    log_function("Start main", config["log_levels"]["level1"],config["log_files"]["commands"], "main.py", 10)
+    logger.info("Starting bot!")
     bot.polling(none_stop=True)

@@ -3,7 +3,7 @@ import datetime
 
 from logging_config import *
 from telebot import types
-from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
+from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton, InputFile
 from utils import take_info, ask_language, main_menu, escape_markdown, save_photo, save_video, bot, translations, get_user_id
 from decorators import admin_private_required
 from config import config, group_chat_id, roles, user_lang, topics
@@ -310,18 +310,17 @@ def fiit_map(message):
     chat_id, topic_id, login, message_id, lang = take_info(message)
 
     markup = InlineKeyboardMarkup()
-    button1 = InlineKeyboardButton(text="See Online", url="http://stavba.fiit.stuba.sk/mapa/")
-    button2 = InlineKeyboardButton(text="Download Map", callback_data='download_map')
-    markup.add(button1, button2)
+    button1 = InlineKeyboardButton(text="See Online (may not work)", url="http://stavba.fiit.stuba.sk/mapa/")
+    markup.add(button1)
 
     bot.delete_message(chat_id, message_id)
-    bot.send_message(chat_id, translations[lang]['fiit_map'], reply_markup=markup, message_thread_id=topic_id)
+    bot.send_photo(chat_id, InputFile('../photos/static/full_map.png'), caption=translations[lang]['fiit_map'], reply_markup=markup, message_thread_id=topic_id)
 
-    @bot.callback_query_handler(func=lambda call: call.data == 'download_map')
-    def send_map_archive_to_private_mess(call):
-        path = '../photos/static/mapa_FIIT.zip'
-        with open(path, 'rb') as file:
-            bot.send_document(call.message.chat.id, file,message_thread_id=topic_id)
+    # @bot.callback_query_handler(func=lambda call: call.data == 'download_map')
+    # def send_map_archive_to_private_mess(call):
+    #     path = '../photos/static/mapa_FIIT.zip'
+    #     with open(path, 'rb') as file:
+    #         bot.send_document(call.message.chat.id, file,message_thread_id=topic_id)
 
 
 # Handler for the /exam_schedule command

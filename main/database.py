@@ -1,8 +1,9 @@
 # main/database.py
 import sqlite3
-from logging_config import *
 from config import config
+import logging
 
+logger = logging.getLogger(__name__)
 
 def setup_database():
     try:
@@ -18,7 +19,7 @@ def setup_database():
                 warns INTEGER DEFAULT 0
             )
         """)
-        log_function(f"Created table 'users' if it did not exist.", config["log_levels"]["level1"], config["log_files"]["database"], "database.py", 22)
+        logger.info("Created table 'users' if it did not exist.")
 
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS posts (
@@ -30,17 +31,17 @@ def setup_database():
                 FOREIGN KEY(user_id) REFERENCES users(id)
             )
         """)
-        log_function(f"Created table 'posts' if it did not exist.", config["log_levels"]["level1"], config["log_files"]["database"],"database.py", 34)
+        logger.info("Created table 'posts' if it did not exist.")
 
         connection.commit()
-        log_function(f"Database changes committed successfully.", config["log_levels"]["level1"], config["log_files"]["database"],"database.py", 37)
+        logger.info("Database changes committed successfully.")
     except sqlite3.Error as e:
-        log_function(f"Database error: {e}", config["log_levels"]["level2"], config["log_files"]["database"],"database.py", 39)
+        logger.error(f"Database error: {e}", exc_info=1)
     except Exception as e:
-        log_function(f"General error: {e}", config["log_levels"]["level2"], config["log_files"]["database"],"database.py", 41)
+        logger.error(f"General error: {e}", exc_info=1)
     finally:
         if cursor:
             cursor.close()
         if connection:
             connection.close()
-        log_function(f"Database connection closed.", config["log_levels"]["level1"], config["log_files"]["database"],"database.py", 47)
+        logger.info(f"Database connection closed.")

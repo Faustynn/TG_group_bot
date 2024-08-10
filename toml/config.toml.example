@@ -1,9 +1,15 @@
-topics = 122
 [telegram]
 key = "XXX:YYYY" # telegram bot token, get from @BotFather
-groupChat = -123                                       # group chat ID, get with telegram dev mode
+groupChat = -123 # group chat ID, get with telegram dev mode
+
+[topics]
+name_1 = "1" # topic ID for the first topic
+name_2 = "123" # topic ID for the second topic
+#etc.
+
 [database]
 path = "../db/database.sql" # path to the SQLite DB file
+
 [logging]
 mainLevel = "DEBUG"    # severity settings for the main logger
 telegramLevel = "INFO" # severity for any telegram related loggers

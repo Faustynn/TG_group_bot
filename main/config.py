@@ -7,7 +7,7 @@ group_chat_id: int = int(config['telegram']['groupChat'])
 main_logging_level: str = config['logging']['mainLevel']
 telegram_logging_level: str = config['logging']['telegramLevel']
 topics = config['topics']
-roles = toml.load('../toml/hight_roles.toml')['roles']
+roles: str = toml.load('../toml/hight_roles.toml')['roles']
 user_lang = {}
 user_media = {}
 

@@ -5,3 +5,4 @@ pyTelegramBotAPI==4.21.0
 requests==2.32.3
 toml==0.10.2
 urllib3==2.2.2
+telebot~=0.0.5

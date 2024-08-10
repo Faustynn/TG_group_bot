@@ -4,7 +4,6 @@
 db/database.sql
 # get pip
 get-pip.py
-*.txt
 old_main
 # python bytecode cache
 __pycache__/
